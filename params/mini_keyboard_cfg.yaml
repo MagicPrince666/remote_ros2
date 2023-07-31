@@ -1,0 +1,18 @@
+/remote_node:
+  ros__parameters:
+    # 遥控类型 sbus/gamepad/keyboard/socket/sonnyps2
+    type: "keyboard"
+    # 端口
+    port: "/dev/input/event13"
+    # 波特率
+    baudrate: 0
+    # 1帧数据长度
+    data_len: 0
+    # 最大量程
+    joy_var_max: 127
+    # 最小量程
+    joy_var_min: -127
+    # 线速度最大值 单位m/s
+    max_x_vel: 1.0
+    # 角速度最大值 单位rad/s
+    max_w_vel: 1.0
