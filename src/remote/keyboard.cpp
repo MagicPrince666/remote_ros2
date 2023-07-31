@@ -54,7 +54,7 @@ int KeyBoard::GetKeyBoard()
     int ret = read(keyboard_fd_, &event, sizeof(event));
     if (ret > 0) {
         if (debug_) {
-            printf("Type = %d\tCode = %d\tValue = %d", event.type, event.code, event.value);
+            printf("Type = %d\tCode = %d\tValue = %d\n", event.type, event.code, event.value);
         }
         std::lock_guard<std::mutex> mylock_guard(rc_data_lock_);
         rc_data_.lose_signal = false;
