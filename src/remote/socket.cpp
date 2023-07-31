@@ -56,17 +56,13 @@ int UdpSocket::GetClientData()
     printf("Recvfrom %s port %d\n",
            inet_ntop(AF_INET, &cliaddr.sin_addr, str, sizeof(str)), ntohs(cliaddr.sin_port));
     
-    memcpy(rc_data_, buf, sizeof(rc_data_));
+    memcpy((char *)&rc_data_, buf, sizeof(rc_data_));
 
     return 0;
 }
 
 bool UdpSocket::Request(struct RemoteState &data)
 {
-    memset((int8_t *)&data, 0, sizeof(data));
-    data.lose_signal = false; // 失控标识
-    data.adslx      = rc_data_[0];  // 左摇杆x轴
-    data.adsly      = rc_data_[1];  // 左摇杆y轴
-    data.adsry      = rc_data_[2];  // 右摇杆y轴
-    return false;
+    data = rc_data_;
+    return true;
 }

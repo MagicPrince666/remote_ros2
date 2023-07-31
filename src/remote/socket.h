@@ -27,7 +27,7 @@ public:
 private:
     int GetClientData();
     int socket_fd_;
-    uint8_t rc_data_[4];
+    RemoteState rc_data_;
 };
 
 // 生产udp遥控工厂
