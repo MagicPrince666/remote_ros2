@@ -5,9 +5,6 @@
 #include <linux/input.h>
 #include <unistd.h>
 
-#include "spdlog/fmt/ostr.h"
-#include "spdlog/spdlog.h"
-
 #include "keyboard.h"
 #include "xepoll.h"
 
@@ -57,7 +54,7 @@ int KeyBoard::GetKeyBoard()
     int ret = read(keyboard_fd_, &event, sizeof(event));
     if (ret > 0) {
         if (debug_) {
-            spdlog::info("Type = {}\tCode = {}\tValue = {}", event.type, event.code, event.value);
+            printf("Type = %d\tCode = %d\tValue = %d", event.type, event.code, event.value);
         }
         std::lock_guard<std::mutex> mylock_guard(rc_data_lock_);
         rc_data_.lose_signal = false;
