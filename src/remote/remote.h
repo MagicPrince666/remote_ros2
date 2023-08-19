@@ -35,7 +35,7 @@ struct RemoteState {
     float adsly        = 0.5;   // 左摇杆y轴
     float adsrx        = 0.5;   // 右摇杆x轴
     float adsry        = 0.5;   // 右摇杆y轴
-    uint8_t ads[12]    = {0};   // 扩展通道 sbus 16路通道都是模拟量
+    float ads[12]    = {0};   // 扩展通道 sbus 16路通道都是模拟量
 };
 
 typedef struct {
