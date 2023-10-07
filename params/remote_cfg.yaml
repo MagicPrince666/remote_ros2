@@ -11,7 +11,7 @@
     # 最大量程
     joy_var_max: 1800
     # 最小量程
-    joy_var_min: 200
+    joy_var_min: 199
     # 线速度最大值 单位m/s
     max_x_vel: 1.0
     # 角速度最大值 单位rad/s
