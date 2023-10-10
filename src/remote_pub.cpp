@@ -101,7 +101,7 @@ void RemotePub::LoopCallback()
         remote_->Request(rc_data);
     }
     geometry_msgs::msg::Twist msg;
-    msg.linear.x  = (1 - 2.0 * rc_data.adsry) * config_.max_x_vel; // 右摇杆y轴 线速度
+    msg.linear.x  = (1 - 2.0 * rc_data.adsly) * config_.max_x_vel; // 左摇杆y轴 线速度
     msg.angular.z = (1 - 2.0 * rc_data.adsrx) * config_.max_w_vel; // 右摇杆x轴 角速度
     RCLCPP_INFO(this->get_logger(), "linear: [%f]\tangular : [%f]", msg.linear.x, msg.angular.z);
     remote_pub_->publish(msg);
