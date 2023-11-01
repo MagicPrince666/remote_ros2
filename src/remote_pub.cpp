@@ -87,7 +87,7 @@ RemotePub::RemotePub() : rclcpp::Node("remote")
     remote_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
     loop_timer_ = this->create_wall_timer(
-        std::chrono::milliseconds(100), std::bind(&RemotePub::LoopCallback, this));
+        std::chrono::milliseconds(20), std::bind(&RemotePub::LoopCallback, this));
 }
 
 RemotePub::~RemotePub()
@@ -99,10 +99,27 @@ void RemotePub::LoopCallback()
     RemoteState rc_data;
     if (remote_) {
         remote_->Request(rc_data);
+    } else {
+        return;
     }
+
+    if (rc_data.adsrx == 0 || rc_data.adsry == 0) {
+        RCLCPP_INFO(this->get_logger(), "adsrx = %f\tadsry = %f", rc_data.adsrx, rc_data.adsry);
+        return;
+    }
+
     geometry_msgs::msg::Twist msg;
-    msg.linear.x  = (1 - 2.0 * rc_data.adsly) * config_.max_x_vel; // 左摇杆y轴 线速度
-    msg.angular.z = (1 - 2.0 * rc_data.adsrx) * config_.max_w_vel; // 右摇杆x轴 角速度
-    RCLCPP_INFO(this->get_logger(), "linear: [%f]\tangular : [%f]", msg.linear.x, msg.angular.z);
+    msg.linear.x  = (1 - 2.0 * rc_data.adsry) * config_.max_x_vel; // 左摇杆y轴 线速度
+    msg.angular.z = (1 - 2.0 * rc_data.adsrx) * config_.max_w_vel; // 左摇杆x轴 角速度
+
+    if (msg.linear.x > -0.1 && msg.linear.x < 0.1) {
+        msg.linear.x = 0.0;
+    }
+
+    if (msg.angular.z > -0.1 && msg.angular.z < 0.1) {
+        msg.angular.z = 0.0;
+    }
+
+    // RCLCPP_INFO(this->get_logger(), "linear: [%f]\tangular : [%f]", msg.linear.x, msg.angular.z);
     remote_pub_->publish(msg);
 }

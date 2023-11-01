@@ -3,7 +3,7 @@
     # 遥控类型 sbus/gamepad/keyboard/socket/sonnyps2
     type: "sbus"
     # 端口
-    port: "/dev/ttyUSB0"
+    port: "/dev/sbus"
     # 波特率
     baudrate: 100000
     # 1帧数据长度
