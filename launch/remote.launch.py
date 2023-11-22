@@ -13,15 +13,34 @@ def generate_launch_description():
 
     remote_config = os.path.join(get_package_share_directory('remote'), 'params', 'remote_cfg.yaml')
 
-    sbus_node = Node(
-        package='remote',
-        executable='remote_node',
-        name='remote_node',
-        output='screen',
-        parameters=[remote_config],
-        namespace='/',
-        )
     
-    return LaunchDescription([
-        sbus_node,
-    ])
+
+    ROS_DISTRO=''
+    ROS_DISTRO = os.getenv('ROS_DISTRO')
+    print("Current ROS2 Version: ",ROS_DISTRO)
+    if ROS_DISTRO == 'humble' and ROS_DISTRO == 'foxy':
+        sbus_node = Node(
+            package='remote',
+            executable='remote_node',
+            name='remote_node',
+            output='screen',
+            parameters=[remote_config],
+            namespace='/',
+            )
+        
+        return LaunchDescription([
+            sbus_node,
+        ])
+    else:
+        sbus_node = Node(
+            package='remote',
+            node_executable='remote_node',
+            node_name='remote_node',
+            output='screen',
+            parameters=[remote_config],
+            node_namespace='/',
+            )
+        
+        return LaunchDescription([
+            sbus_node,
+        ])
