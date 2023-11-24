@@ -18,7 +18,7 @@ def generate_launch_description():
     ROS_DISTRO=''
     ROS_DISTRO = os.getenv('ROS_DISTRO')
     print("Current ROS2 Version: ",ROS_DISTRO)
-    if ROS_DISTRO == 'humble' and ROS_DISTRO == 'foxy':
+    if ROS_DISTRO == 'humble' or ROS_DISTRO == 'foxy':
         sbus_node = Node(
             package='remote',
             executable='remote_node',
