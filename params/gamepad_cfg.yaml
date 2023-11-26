@@ -13,6 +13,6 @@
     # 最小量程
     joy_var_min: -32767
     # 线速度最大值 单位m/s
-    max_x_vel: 1.0
+    max_x_vel: 0.5
     # 角速度最大值 单位rad/s
     max_w_vel: 1.0

@@ -109,8 +109,13 @@ void RemotePub::LoopCallback()
     }
 
     geometry_msgs::msg::Twist msg;
-    msg.linear.x  = (1 - 2.0 * rc_data.adsry) * config_.max_x_vel; // 左摇杆y轴 线速度
-    msg.angular.z = (1 - 2.0 * rc_data.adsrx) * config_.max_w_vel; // 左摇杆x轴 角速度
+    if (config_.type == "gamepad") {
+        msg.linear.x  = (1 - 2.0 * rc_data.adsly) * config_.max_x_vel; // 左摇杆y轴 线速度
+        msg.angular.z = (1 - 2.0 * rc_data.adsrx) * config_.max_w_vel; // 左摇杆x轴 角速度
+    } else {
+        msg.linear.x  = (1 - 2.0 * rc_data.adsry) * config_.max_x_vel; // 左摇杆y轴 线速度
+        msg.angular.z = (1 - 2.0 * rc_data.adsrx) * config_.max_w_vel; // 左摇杆x轴 角速度
+    }
 
     if (msg.linear.x > -0.1 && msg.linear.x < 0.1) {
         msg.linear.x = 0.0;
