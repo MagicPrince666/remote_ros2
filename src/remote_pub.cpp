@@ -103,7 +103,7 @@ void RemotePub::LoopCallback()
         return;
     }
 
-    if (rc_data.adsrx == 0 || rc_data.adsry == 0) {
+    if (config_.type == "sbus" && (rc_data.adsrx == 0 && rc_data.adsry == 0)) {
         RCLCPP_INFO(this->get_logger(), "adsrx = %f\tadsry = %f", rc_data.adsrx, rc_data.adsry);
         return;
     }
