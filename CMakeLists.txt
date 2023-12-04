@@ -15,16 +15,28 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
+message(STATUS "${LIB_NAME} Ros version : $ENV{ROS_DISTRO}")
+if ($ENV{ROS_DISTRO} MATCHES "iron")
+  add_definitions(-DUSE_IRON_VERSION)
+  set(USE_ROS1_MIDDLE_PRICE OFF)
+elseif ($ENV{ROS_DISTRO} MATCHES "humble")
+  add_definitions(-DUSE_HUMBLE_VERSION)
+  set(USE_ROS1_MIDDLE_PRICE OFF)
+elseif ($ENV{ROS_DISTRO} MATCHES "foxy")
+  add_definitions(-DUSE_FOXY_VERSION)
+  set(USE_ROS1_MIDDLE_PRICE OFF)
+elseif ($ENV{ROS_DISTRO} MATCHES "dashing")
+  add_definitions(-DUSE_DASHING_VERSION)
+  set(USE_ROS1_MIDDLE_PRICE OFF)
+elseif ($ENV{ROS_DISTRO} MATCHES "noetic")
+  add_definitions(-DUSE_ROS_NORTIC_VERSION)
+  set(USE_ROS1_MIDDLE_PRICE ON)
+elseif ($ENV{ROS_DISTRO} MATCHES "melodic")
+  add_definitions(-DUSE_ROS_MELODIC_VERSION)
+  set(USE_ROS1_MIDDLE_PRICE ON)
+endif()
 
 include_directories(
-    ${roscpp_INCLUDE_DIRS} 
-    ${roslib_INCLUDE_DIRS} 
     include
     src/remote
     src/utils
@@ -34,6 +46,22 @@ file(GLOB main_srcs
     src/*.cpp
     src/remote/*.cpp
     src/utils/*.cpp
+)
+
+if(USE_ROS1_MIDDLE_PRICE)
+######################## 使用ROS1 作为中间件 ###########################
+#######################################################################
+else()
+######################## 使用ROS2 作为中间件 ###########################
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
+include_directories(
+    ${roscpp_INCLUDE_DIRS} 
+    ${roslib_INCLUDE_DIRS} 
 )
 
 add_executable(${PROJECT_NAME}_node ${main_srcs})
@@ -62,3 +90,5 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+#######################################################################
+endif()
