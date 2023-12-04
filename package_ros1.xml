@@ -9,6 +9,10 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
+  <build_depend>geometry_msgs</build_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+
   <buildtool_depend>message_generation</buildtool_depend>
   <buildtool_depend>sensor_msgs</buildtool_depend>
 

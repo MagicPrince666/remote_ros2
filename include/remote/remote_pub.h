@@ -11,9 +11,13 @@
 #define __REMOTE_PUB_H__
 
 #include <memory>
-
-#include "rclcpp/rclcpp.hpp"
+#if defined(USE_ROS_NORTIC_VERSION) || defined(USE_ROS_MELODIC_VERSION)
+#include <ros/ros.h>
+#include <geometry_msgs/Twist.h>
+#else
+#include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#endif
 
 #include "RemoteFactory.h"
 
@@ -28,12 +32,14 @@ public:
     ~RemotePub();
 
 private:
-    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr remote_pub_;
-    rclcpp::TimerBase::SharedPtr loop_timer_;
-
 #if defined(USE_ROS_NORTIC_VERSION) || defined(USE_ROS_MELODIC_VERSION)
+    using TwistMsg = geometry_msgs::Twist;
+    std::shared_ptr<ros::Publisher> remote_pub_;
     std::shared_ptr<ros::NodeHandle> ros_node_;
 #else
+    using TwistMsg = geometry_msgs::msg::Twist;
+    rclcpp::Publisher<TwistMsg>::SharedPtr remote_pub_;
+    rclcpp::TimerBase::SharedPtr loop_timer_;
     std::shared_ptr<rclcpp::Node> ros_node_;
 #endif
 

@@ -12,7 +12,7 @@
 #include <thread>
 #include <unistd.h>
 
-#include "rclcpp/rclcpp.hpp"
+#include <spdlog/spdlog.h>
 #include "remote/remote_pub.h"
 
 #include "Gamepad.hpp"
@@ -29,37 +29,63 @@ RemotePub::RemotePub(std::shared_ptr<rclcpp::Node> node)
 #endif
 : ros_node_(node)
 {
+#if defined(USE_ROS_NORTIC_VERSION) || defined(USE_ROS_MELODIC_VERSION)
+    ros_node_->getParam("remote_node/type", config_.type);
+    spdlog::info("type = {}", config_.type.c_str());
+
+    ros_node_->getParam("remote_node/port", config_.port);
+    spdlog::info("port = {}", config_.port.c_str());
+
+    ros_node_->getParam("remote_node/baudrate", config_.baudrate);
+    spdlog::info("baudrate = {}", config_.baudrate);
+
+    ros_node_->getParam("remote_node/data_len", config_.data_len);
+    spdlog::info("data_len = {}", config_.data_len);
+
+    ros_node_->getParam("remote_node/joy_var_max", config_.joy_var_max);
+    spdlog::info("joy_var_max = {}", config_.joy_var_max);
+
+    ros_node_->getParam("remote_node/joy_var_min", config_.joy_var_min);
+    spdlog::info("joy_var_min = {}", config_.joy_var_min);
+
+    ros_node_->getParam("remote_node/max_x_vel", config_.max_x_vel);
+    spdlog::info("max_x_vel = {}", config_.max_x_vel);
+
+    ros_node_->getParam("remote_node/max_w_vel", config_.max_w_vel);
+    spdlog::info("max_w_vel = {}", config_.max_w_vel);
+#else
     ros_node_->declare_parameter("type", "");
     ros_node_->get_parameter("type", config_.type);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "type = %s", config_.type.c_str());
+    spdlog::info("type = {}", config_.type.c_str());
 
     ros_node_->declare_parameter("port", "/dev/ttyUSB0");
     ros_node_->get_parameter("port", config_.port);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "port = %s", config_.port.c_str());
+    spdlog::info("port = {}", config_.port.c_str());
 
     ros_node_->declare_parameter("baudrate", 100000);
     ros_node_->get_parameter("baudrate", config_.baudrate);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "baudrate = %d", config_.baudrate);
+    spdlog::info("baudrate = {}", config_.baudrate);
 
     ros_node_->declare_parameter("data_len", 25);
     ros_node_->get_parameter("data_len", config_.data_len);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "data_len = %d", config_.data_len);
+    spdlog::info("data_len = {}", config_.data_len);
 
     ros_node_->declare_parameter("joy_var_max", 1800);
     ros_node_->get_parameter("joy_var_max", config_.joy_var_max);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "joy_var_max = %d", config_.joy_var_max);
+    spdlog::info("joy_var_max = {}", config_.joy_var_max);
 
     ros_node_->declare_parameter("joy_var_min", 200);
     ros_node_->get_parameter("joy_var_min", config_.joy_var_min);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "joy_var_min = %d", config_.joy_var_min);
+    spdlog::info("joy_var_min = {}", config_.joy_var_min);
 
     ros_node_->declare_parameter("max_x_vel", 1.0);
     ros_node_->get_parameter("max_x_vel", config_.max_x_vel);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "max_x_vel = %f", config_.max_x_vel);
+    spdlog::info("max_x_vel = {}", config_.max_x_vel);
 
     ros_node_->declare_parameter("max_w_vel", 1.0);
     ros_node_->get_parameter("max_w_vel", config_.max_w_vel);
-    RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "max_w_vel = %f", config_.max_w_vel);
+    spdlog::info("max_w_vel = {}", config_.max_w_vel);
+#endif
 
     if (config_.type == "sbus") {
         // 创建遥控工厂
@@ -86,13 +112,16 @@ RemotePub::RemotePub(std::shared_ptr<rclcpp::Node> node)
         std::shared_ptr<RemoteProduct> ps2(factory->CreateRemoteProduct(config_, false));
         remote_ = ps2;
     } else {
-        RCLCPP_ERROR(rclcpp::get_logger(__FUNCTION__), "please use an avlable remote");
+        spdlog::error("please use an avlable remote");
     }
-
-    remote_pub_ = ros_node_->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+#if defined(USE_ROS_NORTIC_VERSION) || defined(USE_ROS_MELODIC_VERSION)
+    remote_pub_ = std::make_shared<ros::Publisher>(ros_node_->advertise<TwistMsg>("/cmd_vel", 10));
+#else
+    remote_pub_ = ros_node_->create_publisher<TwistMsg>("/cmd_vel", 10);
 
     loop_timer_ = ros_node_->create_wall_timer(
         std::chrono::milliseconds(20), std::bind(&RemotePub::LoopCallback, this));
+#endif
 }
 
 RemotePub::~RemotePub()
@@ -109,11 +138,11 @@ void RemotePub::LoopCallback()
     }
 
     if (config_.type == "sbus" && (rc_data.adsrx == 0 && rc_data.adsry == 0)) {
-        RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "adsrx = %f\tadsry = %f", rc_data.adsrx, rc_data.adsry);
+        spdlog::info("adsrx = {}\tadsry = {}", rc_data.adsrx, rc_data.adsry);
         return;
     }
 
-    geometry_msgs::msg::Twist msg;
+    TwistMsg msg;
     if (config_.type == "gamepad") {
         msg.linear.x  = (1 - 2.0 * rc_data.adsly) * config_.max_x_vel; // 左摇杆y轴 线速度
         msg.angular.z = (1 - 2.0 * rc_data.adsrx) * config_.max_w_vel; // 左摇杆x轴 角速度
@@ -130,6 +159,6 @@ void RemotePub::LoopCallback()
         msg.angular.z = 0.0;
     }
 
-    // RCLCPP_INFO(rclcpp::get_logger(__FUNCTION__), "linear: [%f]\tangular : [%f]", msg.linear.x, msg.angular.z);
+    // spdlog::info("linear: [{}]\tangular : [{}]", msg.linear.x, msg.angular.z);
     remote_pub_->publish(msg);
 }
