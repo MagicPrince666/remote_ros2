@@ -96,7 +96,7 @@ include_directories(
 )
 
 add_executable(${PROJECT_NAME}_node ${main_srcs})
-target_link_libraries(${PROJECT_NAME}_node pthread)
+target_link_libraries(${PROJECT_NAME}_node pthread spdlog::spdlog)
 ament_target_dependencies(${PROJECT_NAME}_node rclcpp std_msgs geometry_msgs sensor_msgs)
 
 install(TARGETS
