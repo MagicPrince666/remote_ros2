@@ -19,21 +19,30 @@ message(STATUS "${LIB_NAME} Ros version : $ENV{ROS_DISTRO}")
 if ($ENV{ROS_DISTRO} MATCHES "iron")
   add_definitions(-DUSE_IRON_VERSION)
   set(USE_ROS1_MIDDLE_PRICE OFF)
+  find_package(spdlog REQUIRED)
+  set(LIBSPDLOG spdlog::spdlog)
 elseif ($ENV{ROS_DISTRO} MATCHES "humble")
   add_definitions(-DUSE_HUMBLE_VERSION)
   set(USE_ROS1_MIDDLE_PRICE OFF)
+  find_package(spdlog REQUIRED)
+  set(LIBSPDLOG spdlog::spdlog)
 elseif ($ENV{ROS_DISTRO} MATCHES "foxy")
   add_definitions(-DUSE_FOXY_VERSION)
   set(USE_ROS1_MIDDLE_PRICE OFF)
+  find_package(spdlog REQUIRED)
+  set(LIBSPDLOG spdlog::spdlog)
 elseif ($ENV{ROS_DISTRO} MATCHES "dashing")
   add_definitions(-DUSE_DASHING_VERSION)
   set(USE_ROS1_MIDDLE_PRICE OFF)
+  include_directories(include/spdlog)
 elseif ($ENV{ROS_DISTRO} MATCHES "noetic")
   add_definitions(-DUSE_ROS_NORTIC_VERSION)
   set(USE_ROS1_MIDDLE_PRICE ON)
+  include_directories(include/spdlog)
 elseif ($ENV{ROS_DISTRO} MATCHES "melodic")
   add_definitions(-DUSE_ROS_MELODIC_VERSION)
   set(USE_ROS1_MIDDLE_PRICE ON)
+  include_directories(include/spdlog)
 endif()
 
 include_directories(
@@ -57,7 +66,6 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
-find_package(spdlog REQUIRED)
 # generate_messages(
 #   DEPENDENCIES
 #   std_msgs
@@ -76,7 +84,7 @@ catkin_package(
 add_executable(${PROJECT_NAME}_node ${main_srcs})
 add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS}) 
 
-target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} pthread spdlog::spdlog)
+target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} pthread ${LIBSPDLOG})
 
 install(DIRECTORY ${PROJECT_NAME}_node
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
@@ -96,7 +104,7 @@ include_directories(
 )
 
 add_executable(${PROJECT_NAME}_node ${main_srcs})
-target_link_libraries(${PROJECT_NAME}_node pthread spdlog::spdlog)
+target_link_libraries(${PROJECT_NAME}_node pthread ${LIBSPDLOG})
 ament_target_dependencies(${PROJECT_NAME}_node rclcpp std_msgs geometry_msgs sensor_msgs)
 
 install(TARGETS
