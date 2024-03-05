@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cmath>
 #define termios asmtermios
 #include <asm-generic/ioctls.h>
 #include <asm-generic/termbits.h>
@@ -22,14 +23,9 @@ Sbus::Sbus(RemoteConfig_t config, bool debug) : RemoteProduct(config, debug)
 {
     std::cout << "Sbus init with " << config_.port << std::endl;
     sbus_fd_ = -1;
-
-    sbus_fd_ = OpenSerial(config_.port, config_.baudrate);
-    if (sbus_fd_ < 0) {
-        std::cout << "can\'t open " << config_.port << " !" << std::endl;
-    }
-    assert(sbus_fd_ > 0);
-    memset((int8_t *)&rc_data_, 0, sizeof(rc_data_));
-    MY_EPOLL.EpollAddRead(sbus_fd_, std::bind(&Sbus::GetData, this));
+    cutoffFrequency_ = 10.0;  // 截止频率
+    samplingRate_ = 100.0;    // 采样率
+    Init();
 }
 
 Sbus::~Sbus()
@@ -40,6 +36,19 @@ Sbus::~Sbus()
         MY_EPOLL.EpollDel(sbus_fd_);
         close(sbus_fd_);
     }
+}
+
+bool Sbus::Init()
+{
+    sbus_fd_ = OpenSerial(config_.port, config_.baudrate);
+    if (sbus_fd_ < 0) {
+        std::cout << "can\'t open " << config_.port << " !" << std::endl;
+        return false;
+    }
+    assert(sbus_fd_ > 0);
+    memset((int8_t *)&rc_data_, 0, sizeof(rc_data_));
+    MY_EPOLL.EpollAddRead(sbus_fd_, std::bind(&Sbus::GetData, this));
+    return true;
 }
 
 int Sbus::SerialSetSpeciBaud(int baud)
@@ -101,89 +110,137 @@ int Sbus::GetData()
     uint8_t sbus_buf[100];
     int len = read(sbus_fd_, sbus_buf, sizeof(sbus_buf));
     if (len > 0) {
-        memset((int8_t *)&rc_data_, 0, sizeof(rc_data_));
-        SbusDecoderGetBuf(sbus_buf, len); // 解码一帧
-        if (debug_) {
-            for (int i = 0; i < 16; i++) {
-                printf("%02d ", rc_data_.rawdata[i]);
+        int buf_size = sizeof(uart_rx_buffer_.rx_buffer) - uart_rx_buffer_.size;
+        if (buf_size < len) {
+            uart_rx_buffer_.size = 0;
+        }
+        memcpy(uart_rx_buffer_.rx_buffer + uart_rx_buffer_.size, sbus_buf, len);
+        uart_rx_buffer_.size += len; // 更新buff长度
+
+        uint32_t loop_times = uart_rx_buffer_.size / sizeof(sbus_t);
+        for (uint32_t i = 0; i < loop_times; i++) {
+            int index                  = 0;
+            uint8_t *sbus_rx_buffer_ptr = uart_rx_buffer_.rx_buffer;
+            sbus_t *res_tmp = SearchSbusHear(sbus_rx_buffer_ptr, uart_rx_buffer_.size, index);
+
+            if (res_tmp != nullptr) {
+                // 有数据包需要处理
+                if (index) {
+                    sbus_rx_buffer_ptr += index;
+                    uart_rx_buffer_.size -= index;
+                }
+
+                // 解码一帧数据
+                SbusDecoderGetFrame(res_tmp);
+                uart_rx_buffer_.size -= sizeof(sbus_t);
+                uint8_t buffer[256];
+                // 剩余未处理数据拷贝到临时变量
+                memcpy(buffer, sbus_rx_buffer_ptr + sizeof(sbus_t), uart_rx_buffer_.size);
+                // 覆盖掉原来的buff
+                memcpy(uart_rx_buffer_.rx_buffer, buffer, uart_rx_buffer_.size);
+
+                if (debug_) {
+                    for (int i = 0; i < 16; i++) {
+                        printf("%02d ", rc_data_.rawdata[i]);
+                    }
+                    printf("\n");
+                }
+            } else {
+                break;
             }
-            printf("\n");
         }
     }
 
     return len;
 }
 
+sbus_t *Sbus::SearchSbusHear(uint8_t *data, uint32_t total_len, int &index)
+{
+    sbus_t *res_tmp = nullptr;
+    for (uint32_t i = 0; i < total_len; i++) {
+        // 剩余长度大于一个包长度，说明还有协议数据包可以处理
+        if ((total_len - i) >= 25) {
+            // 一个字节一个字节的偏移，直到查找到协议头
+            res_tmp = (sbus_t *)(data + i);
+            // 找到协议头
+            if ((res_tmp->head == 0x0F) && (res_tmp->endbyte == 0x00)) {
+                index = i; // 记录偏移地址
+                break;
+            }
+        } else {
+            return nullptr;
+        }
+    }
+    return res_tmp;
+}
+
 bool Sbus::Request(struct RemoteState &data)
 {
     memset((int8_t *)&data, 0, sizeof(data));
-    data.lose_signal = false;               // 失控标识
-    data.adslx       = rc_data_.percent[2]; // 左摇杆x轴
-    data.adsly       = rc_data_.percent[3]; // 左摇杆y轴
-    data.adsrx       = rc_data_.percent[0]; // 右摇杆x轴
-    data.adsry       = rc_data_.percent[1]; // 右摇杆y轴
-    // data.ads[12]    = {0};   // 扩展通道 sbus 16路通道都是模拟量
-    memcpy(data.ads, rc_data_.percent + 4, 12);
-    return false;
+    std::lock_guard<std::mutex> mylock_guard(data_lock_);
+    if (!rc_data_.flag_refresh) {
+        data.adslx = 0.5;
+        data.adsly = 0.5;
+        data.adsrx = 0.5;
+        data.adsry = 0.5;
+        return false;
+    }
+    data.lose_signal = rc_data_.lost_signed; // 失控标识
+    data.adslx       = rc_data_.percent[3];   // 左摇杆x轴
+    data.adsly       = rc_data_.percent[2];   // 左摇杆y轴
+    data.adsrx       = rc_data_.percent[0];   // 右摇杆x轴
+    data.adsry       = rc_data_.percent[1];   // 右摇杆y轴
+    data.ads[0]      = rc_data_.percent[4];   // 5通道 遥控C拨杆开关
+    data.ads[1]      = rc_data_.percent[5];   // 6通道 遥控左旋钮
+    data.ads[2]      = rc_data_.percent[6];   // 7通道 左后方拨杆
+    data.ads[3]      = rc_data_.percent[7];   // 8通道 遥控右旋钮
+    data.ads[4]      = rc_data_.percent[8];   // 9通道 遥控B拨杆开关
+    data.ads[5]      = rc_data_.percent[9];   // 10通道 遥控A拨杆开关
+    return true;
 }
 
-RcData_t *Sbus::GetChanelDataPtr()
-{
-    return &rc_data_;
+// SBUS遥控器通道滤波函数
+std::vector<double> Sbus::ChannelFilter(const std::vector<double>& input) {
+    std::vector<double> output;
+    output.resize(input.size());
+
+    // 计算滤波器系数
+    double RC = 1.0 / (cutoffFrequency_ * 2 * M_PI);
+    double dt = 1.0 / samplingRate_;
+    double alpha = dt / (RC + dt);
+
+    // 应用低通滤波
+    output[0] = input[0];
+    for (size_t i = 1; i < input.size(); ++i) {
+        output[i] = alpha * input[i] + (1 - alpha) * output[i - 1];
+    }
+
+    return output;
 }
 
-void Sbus::SbusDecoderGetFrame(uint8_t *buf) // 传入一帧数据，解析成各个通道数据，一帧长度必然是25字节
+void Sbus::SbusDecoderGetFrame(sbus_t *buf)
 {
-    rc_data_.rawdata[0]  = ((buf[1] | buf[2] << 8) & 0x07FF);
-    rc_data_.rawdata[1]  = ((buf[2] >> 3 | buf[3] << 5) & 0x07FF);
-    rc_data_.rawdata[2]  = ((buf[3] >> 6 | buf[4] << 2 | buf[5] << 10) & 0x07FF);
-    rc_data_.rawdata[3]  = ((buf[5] >> 1 | buf[6] << 7) & 0x07FF);
-    rc_data_.rawdata[4]  = ((buf[6] >> 4 | buf[7] << 4) & 0x07FF);
-    rc_data_.rawdata[5]  = ((buf[7] >> 7 | buf[8] << 1 | buf[9] << 9) & 0x07FF);
-    rc_data_.rawdata[6]  = ((buf[9] >> 2 | buf[10] << 6) & 0x07FF);
-    rc_data_.rawdata[7]  = ((buf[10] >> 5 | buf[11] << 3) & 0x07FF);
-    rc_data_.rawdata[8]  = ((buf[12] | buf[13] << 8) & 0x07FF);
-    rc_data_.rawdata[9]  = ((buf[13] >> 3 | buf[14] << 5) & 0x07FF);
-    rc_data_.rawdata[10] = ((buf[14] >> 6 | buf[15] << 2 | buf[16] << 10) & 0x07FF);
-    rc_data_.rawdata[11] = ((buf[16] >> 1 | buf[17] << 7) & 0x07FF);
-    rc_data_.rawdata[12] = ((buf[17] >> 4 | buf[18] << 4) & 0x07FF);
-    rc_data_.rawdata[13] = ((buf[18] >> 7 | buf[19] << 1 | buf[20] << 9) & 0x07FF);
-    rc_data_.rawdata[14] = ((buf[20] >> 2 | buf[21] << 6) & 0x07FF);
-    rc_data_.rawdata[15] = ((buf[21] >> 5 | buf[22] << 3) & 0x07FF);
+    std::lock_guard<std::mutex> mylock_guard(data_lock_);
+    rc_data_.rawdata[0]  = ((buf->data[0] | buf->data[1] << 8) & 0x07FF);
+    rc_data_.rawdata[1]  = ((buf->data[1] >> 3 | buf->data[2] << 5) & 0x07FF);
+    rc_data_.rawdata[2]  = ((buf->data[2] >> 6 | buf->data[3] << 2 | buf->data[4] << 10) & 0x07FF);
+    rc_data_.rawdata[3]  = ((buf->data[4] >> 1 | buf->data[5] << 7) & 0x07FF);
+    rc_data_.rawdata[4]  = ((buf->data[5] >> 4 | buf->data[6] << 4) & 0x07FF);
+    rc_data_.rawdata[5]  = ((buf->data[6] >> 7 | buf->data[7] << 1 | buf->data[8] << 9) & 0x07FF);
+    rc_data_.rawdata[6]  = ((buf->data[8] >> 2 | buf->data[9] << 6) & 0x07FF);
+    rc_data_.rawdata[7]  = ((buf->data[9] >> 5 | buf->data[10] << 3) & 0x07FF);
+    rc_data_.rawdata[8]  = ((buf->data[11] | buf->data[12] << 8) & 0x07FF);
+    rc_data_.rawdata[9]  = ((buf->data[12] >> 3 | buf->data[13] << 5) & 0x07FF);
+    rc_data_.rawdata[10] = ((buf->data[13] >> 6 | buf->data[14] << 2 | buf->data[15] << 10) & 0x07FF);
+    rc_data_.rawdata[11] = ((buf->data[15] >> 1 | buf->data[16] << 7) & 0x07FF);
+    rc_data_.rawdata[12] = ((buf->data[16] >> 4 | buf->data[17] << 4) & 0x07FF);
+    rc_data_.rawdata[13] = ((buf->data[17] >> 7 | buf->data[18] << 1 | buf->data[19] << 9) & 0x07FF);
+    rc_data_.rawdata[14] = ((buf->data[19] >> 2 | buf->data[20] << 6) & 0x07FF);
+    rc_data_.rawdata[15] = ((buf->data[20] >> 5 | buf->data[21] << 3) & 0x07FF);
 
     for (uint8_t i = 0; i < 16; i++) {
         rc_data_.percent[i] = (float)(rc_data_.rawdata[i] - config_.joy_var_min) / (config_.joy_var_max - config_.joy_var_min);
     }
     rc_data_.flag_refresh = true;
-}
-
-void Sbus::SbusDecoderGetByte(uint8_t data)
-{
-    static int8_t off_set  = 0;   // 指向下个字节将要保存的位置
-    static uint8_t buf[25] = {0}; // 保存一帧数据
-    buf[off_set]           = data;
-    // 判断当前缓存是否满足一帧的格式
-    int8_t index = off_set + 1;
-    if (index == 25) {
-        index = 0;
-    }
-
-    if (buf[off_set] == 0x00 && buf[index] == 0x0F) { // 当前缓存数据满足0x0F开头且0x00结尾
-        uint8_t buf_frame[25] = {0};
-        memcpy(buf_frame, buf + index, 25 - index);
-        memcpy(buf_frame + 25 - index, buf, index);
-        SbusDecoderGetFrame(buf_frame);
-    }
-
-    off_set++;
-    if (off_set == 25) {
-        off_set = 0;
-    }
-}
-
-void Sbus::SbusDecoderGetBuf(uint8_t *buf, uint16_t len)
-{
-    for (uint16_t i = 0; i < len; i++) {
-        SbusDecoderGetByte(buf[i]);
-    }
+    rc_data_.lost_signed = (buf->flags == 1);
 }
