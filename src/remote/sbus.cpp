@@ -8,7 +8,6 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <cmath>
 #define termios asmtermios
 #include <asm-generic/ioctls.h>
 #include <asm-generic/termbits.h>
@@ -23,8 +22,6 @@ Sbus::Sbus(RemoteConfig_t config, bool debug) : RemoteProduct(config, debug)
 {
     std::cout << "Sbus init with " << config_.port << std::endl;
     sbus_fd_ = -1;
-    cutoffFrequency_ = 10.0;  // 截止频率
-    samplingRate_ = 100.0;    // 采样率
     Init();
 }
 
@@ -199,25 +196,6 @@ bool Sbus::Request(struct RemoteState &data)
     return true;
 }
 
-// SBUS遥控器通道滤波函数
-std::vector<double> Sbus::ChannelFilter(const std::vector<double>& input) {
-    std::vector<double> output;
-    output.resize(input.size());
-
-    // 计算滤波器系数
-    double RC = 1.0 / (cutoffFrequency_ * 2 * M_PI);
-    double dt = 1.0 / samplingRate_;
-    double alpha = dt / (RC + dt);
-
-    // 应用低通滤波
-    output[0] = input[0];
-    for (size_t i = 1; i < input.size(); ++i) {
-        output[i] = alpha * input[i] + (1 - alpha) * output[i - 1];
-    }
-
-    return output;
-}
-
 void Sbus::SbusDecoderGetFrame(sbus_t *buf)
 {
     std::lock_guard<std::mutex> mylock_guard(data_lock_);
@@ -242,5 +220,5 @@ void Sbus::SbusDecoderGetFrame(sbus_t *buf)
         rc_data_.percent[i] = (float)(rc_data_.rawdata[i] - config_.joy_var_min) / (config_.joy_var_max - config_.joy_var_min);
     }
     rc_data_.flag_refresh = true;
-    rc_data_.lost_signed = (buf->flags == 1);
+    rc_data_.lost_signed = (buf->flags & 0x04); // (flags & 0x40)失控标识 (flags & 0x80) 失控保护
 }
