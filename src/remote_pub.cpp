@@ -137,7 +137,7 @@ void RemotePub::LoopCallback()
         return;
     }
 
-    if (config_.type == "sbus" && (rc_data.adsrx == 0 && rc_data.adsry == 0)) {
+    if ((rc_data.adsrx == 0 && rc_data.adsry == 0)) {
         spdlog::info("adsrx = {}\tadsry = {}", rc_data.adsrx, rc_data.adsry);
         return;
     }
