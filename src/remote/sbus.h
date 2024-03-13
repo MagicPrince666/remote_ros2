@@ -13,7 +13,6 @@
 #include <iostream>
 #include <stdint.h>
 #include <mutex>
-#include <vector>
 
 typedef struct {
     uint16_t rawdata[16];      // 根据sbus协议，一帧包含16通道，每通道11位（0-2047）
@@ -39,10 +38,6 @@ private:
     RcData_t rc_data_;
     std::mutex data_lock_;
 
-    // 通道滤波参数
-    double cutoffFrequency_;  // 截止频率
-    double samplingRate_;    // 采样率
-
     struct {
         uint8_t rx_buffer[256];
         uint32_t size; // buf长度
@@ -55,8 +50,6 @@ private:
     void SbusDecoderGetFrame(sbus_t *buf);
 
     sbus_t *SearchSbusHear(uint8_t *data, uint32_t total_len, int &index);
-
-    std::vector<double> ChannelFilter(const std::vector<double>& input);
 
 public:
     Sbus(RemoteConfig_t config, bool debug = false);
