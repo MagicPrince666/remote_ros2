@@ -68,16 +68,10 @@ int main(int argc, char *argv[])
 
 #if defined(USE_ROS_NORTIC_VERSION) || defined(USE_ROS_MELODIC_VERSION)
     ros::init(argc, argv, "remote");
-    ros::Rate loop_rate(100);
     auto ros_node = std::make_shared<ros::NodeHandle>();
     auto remote_mode = std::make_shared<RemotePub>(ros_node);
 
-    while (ros::ok()) {
-        if(remote_mode) {
-        }
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
+    ros::spin();
     ros::shutdown();
 #else
     rclcpp::init(argc, argv);

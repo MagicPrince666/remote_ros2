@@ -30,28 +30,28 @@ RemotePub::RemotePub(std::shared_ptr<rclcpp::Node> node)
 : ros_node_(node)
 {
 #if defined(USE_ROS_NORTIC_VERSION) || defined(USE_ROS_MELODIC_VERSION)
-    ros_node_->getParam("remote_node/type", config_.type);
+    ros_node_->getParam("remote_node/ros__parameters/type", config_.type);
     spdlog::info("type = {}", config_.type.c_str());
 
-    ros_node_->getParam("remote_node/port", config_.port);
+    ros_node_->getParam("remote_node/ros__parameters/port", config_.port);
     spdlog::info("port = {}", config_.port.c_str());
 
-    ros_node_->getParam("remote_node/baudrate", config_.baudrate);
+    ros_node_->getParam("remote_node/ros__parameters/baudrate", config_.baudrate);
     spdlog::info("baudrate = {}", config_.baudrate);
 
-    ros_node_->getParam("remote_node/data_len", config_.data_len);
+    ros_node_->getParam("remote_node/ros__parameters/data_len", config_.data_len);
     spdlog::info("data_len = {}", config_.data_len);
 
-    ros_node_->getParam("remote_node/joy_var_max", config_.joy_var_max);
+    ros_node_->getParam("remote_node/ros__parameters/joy_var_max", config_.joy_var_max);
     spdlog::info("joy_var_max = {}", config_.joy_var_max);
 
-    ros_node_->getParam("remote_node/joy_var_min", config_.joy_var_min);
+    ros_node_->getParam("remote_node/ros__parameters/joy_var_min", config_.joy_var_min);
     spdlog::info("joy_var_min = {}", config_.joy_var_min);
 
-    ros_node_->getParam("remote_node/max_x_vel", config_.max_x_vel);
+    ros_node_->getParam("remote_node/ros__parameters/max_x_vel", config_.max_x_vel);
     spdlog::info("max_x_vel = {}", config_.max_x_vel);
 
-    ros_node_->getParam("remote_node/max_w_vel", config_.max_w_vel);
+    ros_node_->getParam("remote_node/ros__parameters/max_w_vel", config_.max_w_vel);
     spdlog::info("max_w_vel = {}", config_.max_w_vel);
 #else
     ros_node_->declare_parameter("type", "");
@@ -116,6 +116,8 @@ RemotePub::RemotePub(std::shared_ptr<rclcpp::Node> node)
     }
 #if defined(USE_ROS_NORTIC_VERSION) || defined(USE_ROS_MELODIC_VERSION)
     remote_pub_ = std::make_shared<ros::Publisher>(ros_node_->advertise<TwistMsg>("/cmd_vel", 10));
+
+    loop_timer_ = ros_node_->createTimer(ros::Duration(0.02), std::bind(&RemotePub::LoopCallback, this));
 #else
     remote_pub_ = ros_node_->create_publisher<TwistMsg>("/cmd_vel", 10);
 

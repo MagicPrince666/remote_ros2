@@ -36,6 +36,7 @@ private:
     using TwistMsg = geometry_msgs::Twist;
     std::shared_ptr<ros::Publisher> remote_pub_;
     std::shared_ptr<ros::NodeHandle> ros_node_;
+    ros::Timer loop_timer_;
 #else
     using TwistMsg = geometry_msgs::msg::Twist;
     rclcpp::Publisher<TwistMsg>::SharedPtr remote_pub_;
